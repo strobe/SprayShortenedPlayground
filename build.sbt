@@ -5,8 +5,10 @@ version := "1.0"
 scalaVersion := "2.11.4"
 
 libraryDependencies ++= Seq(
+    // Config
+    "com.github.kxbmap"       %% "configs"           % "0.2.2" withSources()
     // Database
-     "org.postgresql"         %  "postgresql"        % "9.2-1002-jdbc4"
+    ,"org.postgresql"         %  "postgresql"        % "9.2-1002-jdbc4"
     ,"com.typesafe.slick"     %% "slick"             % "2.1.0"
     ,"org.slf4j"              %  "slf4j-nop"         % "1.6.4"
     ,"org.specs2"             %% "specs2"            % "2.4.2" % "test"

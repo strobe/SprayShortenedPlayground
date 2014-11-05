@@ -7,17 +7,23 @@ import cc.evgeniy.shortener.ExtendedPostgresDriver.simple._
 import com.github.tototoshi.slick.PostgresJodaSupport._
 
 import scala.slick.lifted
+import com.typesafe.config.ConfigFactory
+//import com.github.kxbmap.configs._
 
 object Hello {
   def main(args: Array[String]): Unit = {
     println("Hello, world!")
 
-    Database.forURL("jdbc:postgresql://localhost:5432/shortener_db", driver = "org.postgresql.Driver",
-      user = "shortener_db", password = "carryx") withSession {
+    // loading configuration
+    val config    = ConfigFactory.load()
+    val user      = config.getString("urls-shortener.db.default.user")
+    val password  = config.getString("urls-shortener.db.default.password")
+    val driver    = config.getString("urls-shortener.db.default.driver")
+    val url       = config.getString("urls-shortener.db.default.url")
+
+
+    Database.forURL(url, driver = driver, user = user, password = password) withSession {
       implicit session =>
-
-
-
 
         // Insert some suppliers
 //        Users insert User(None, "Acme, Inc.")
