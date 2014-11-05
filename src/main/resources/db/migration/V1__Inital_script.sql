@@ -1,41 +1,42 @@
-/* Single line comment */
-CREATE TABLE "User"
+/* Default table structure */
+CREATE TABLE "Users"
 (
-    userID BIGSERIAL PRIMARY KEY NOT NULL,
+    user_id BIGSERIAL PRIMARY KEY NOT NULL,
     token VARCHAR
 
 );
 
-CREATE TABLE "Link"
+CREATE TABLE "Folders"
 (
-    linkID BIGSERIAL PRIMARY KEY NOT NULL,
-    userId BIGSERIAL REFERENCES "User" (userID),
-    folderId BIGSERIAL REFERENCES "Folder" (folderID),
+    folder_id BIGSERIAL PRIMARY KEY NOT NULL,
+    user_id BIGSERIAL REFERENCES "Users" (user_id),
+    title VARCHAR
+);
+
+CREATE TABLE "Links"
+(
+    link_id BIGSERIAL PRIMARY KEY NOT NULL,
+    user_id BIGSERIAL REFERENCES "Users" (user_id),
     url TEXT,
     code TEXT
 );
 
-CREATE TABLE "Click"
+CREATE TABLE "Clicks"
 (
-    clickID BIGSERIAL PRIMARY KEY NOT NULL,
-    linkID BIGSERIAL REFERENCES "Link" (linkID),
+    click_id BIGSERIAL PRIMARY KEY NOT NULL,
+    link_id BIGSERIAL REFERENCES "Links" (link_id),
     date DATE,
     referer TEXT,
     remote_ip INET
 );
 
-CREATE TABLE "FolderLink"
+CREATE TABLE "FolderLinks"
 (
-    folderID BIGSERIAL PRIMARY KEY NOT NULL REFERENCES "Folder" (folderID),
-    linkID BIGSERIAL REFERENCES "Link" (linkID)
+    folder_id BIGSERIAL PRIMARY KEY NOT NULL REFERENCES "Folders" (folder_id),
+    link_id BIGSERIAL REFERENCES "Links" (link_id)
 );
 
-CREATE TABLE "Folder"
-(
-    folderID BIGSERIAL PRIMARY KEY NOT NULL,
-    userId BIGSERIAL REFERENCES "User" (userID),
-    title VARCHAR
-);
+
 
 -- ALTER TABLE "User" ADD FOREIGN KEY (userID) REFERENCES "Link" (id);
 -- ALTER TABLE "Folder" ADD FOREIGN KEY (id) REFERENCES "Link" (id);
