@@ -160,62 +160,58 @@ trait ShortenedServerService extends HttpService {
         }
       }
     } ~
-    path("link") {
-      post {
-        entity(as[SourceLinkParameter]) { link =>
-          complete(s"$link")
-        }
-      }
-    } ~
-    pathPrefix("link" / IntNumber ) { code =>
+    pathPrefix("link") {
       pathEnd {
         post {
-          entity(as[ClickParameter]) { click =>
-            complete(s"$click")
+          entity(as[SourceLinkParameter]) { link =>
+            complete(s"$link")
           }
-        }
-      }
-    } ~
-    pathPrefix("link" / IntNumber ) { code =>
-      pathEnd {
+        } ~
         get {
-          parameters('token.as[String]) { token => {
+          parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
             complete("not implemented")
           }
+        }
+      } ~
+      pathPrefix(Segment) { code =>
+        pathEnd {
+          post {
+            entity(as[ClickParameter]) { click =>
+              complete(s"$click")
+            } ~
+              entity(as[SourceLinkParameter]) { link =>
+                complete(s"$link")
+              }
+          } ~
+          get {
+            parameters('token.as[String]) { token =>
+              complete("not implemented")
+            }
+          }
+
+        } ~
+        pathSuffix("clicks") {
+          get {
+            complete(code.toString)
           }
         }
       }
     } ~
-    pathPrefix("folder" / IntNumber ) { id =>
+    path("folder") {
       pathEnd {
+        get {
+          parameters('token.as[String]) { token =>
+            complete("not implemented")
+          }
+        }
+      } ~
+      pathSuffix(LongNumber) { id =>
         get {
           parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
             complete("not implemented")
           }
         }
       }
-    } ~
-    path("link") {
-      get {
-        parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
-          complete("not implemented")
-        }
-      }
-    } ~
-    path("folder") {
-      get {
-        parameters('token.as[String]) { token =>
-          complete("not implemented")
-        }
-      }
-    } ~
-    pathPrefix("link" / Segment) {
-      code =>
-        pathSuffix("clicks") {
-          get {
-            complete(code.toString)
-          }
-        }
     }
 
   ////////////// helpers //////////////
