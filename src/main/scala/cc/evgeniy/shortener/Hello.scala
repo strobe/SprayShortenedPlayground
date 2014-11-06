@@ -8,6 +8,7 @@ import org.joda.time.DateTime
 import spray.can.Http
 import spray.http.HttpEntity
 import spray.http.MediaTypes._
+import spray.httpx.SprayJsonSupport
 import spray.json.DefaultJsonProtocol
 import spray.routing.HttpService
 import spray.json._
@@ -75,7 +76,7 @@ object AkkaSprayScalaExample extends App {
   val service = system.actorOf(Props[ShortenedServerActor], "spray-streamer-service")
 
   // http initialization
-  IO(Http) ! Http.Bind(service, interface = "localhost", port = 8050)
+  IO(Http) ! Http.Bind(service, interface = "localhost", port = 8080)
 }
 
 /**
@@ -95,11 +96,27 @@ class ShortenedServerActor extends Actor with ShortenedServerService with ActorL
   def receive = runRoute(apiRoute) // route DSL
 }
 
+
+object RequestParams {
+  // {"token": "12341", "url": "http://", "code": 21}
+  case class SourceLinkParameter(token: String, url: String, code: Option[Int], folderId: Option[Int])
+  // {"referer": "12341", "remote_ip": "10.10.0.1"}
+  case class ClickParameter(referer: String, remote_ip: String)
+
+  object SourceLinkJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
+    implicit val SourceLinkFormats = jsonFormat4(SourceLinkParameter)
+    implicit val ClickFormats      = jsonFormat2(ClickParameter)
+  }
+}
+
+
 /**
  * Server trait.
  * this trait defines our service behavior independently from the service actor
  */
 trait ShortenedServerService extends HttpService {
+  import RequestParams._
+  import RequestParams.SourceLinkJsonSupport._
 
   // These implicit values allow us to use futures
   // in this trait.
@@ -115,25 +132,91 @@ trait ShortenedServerService extends HttpService {
         complete { index }
       }
     } ~
-      path("ping") {
-        get {
-          complete("PONG")
-        }
-      } ~
-      path("simple_json") {
-        get {
-          respondWithMediaType(`application/json`) {
-            // Sray-json example https://github.com/spray/spray-json
-            case class Color(name: String, red: Int, green: Int, blue: Int)
-            object MyJsonProtocol extends DefaultJsonProtocol {
-              implicit val colorFormat = jsonFormat4(Color)
-            }
-            import MyJsonProtocol._
+    path("ping") {
+      get {
+        complete("PONG")
+      }
+    } ~
+    path("simple_json") {
+      get {
+        respondWithMediaType(`application/json`) {
+          // Sray-json example https://github.com/spray/spray-json
+          case class Color(name: String, red: Int, green: Int, blue: Int)
+          object MyJsonProtocol extends DefaultJsonProtocol {
+            implicit val colorFormat = jsonFormat4(Color)
+          }
+          import MyJsonProtocol._
 
-            complete(Color("CadetBlue", 95, 158, 160).toJson.prettyPrint)
+          complete(Color("CadetBlue", 95, 158, 160).toJson.prettyPrint)
+        }
+      }
+    } ~
+    /// API ///
+    path("token") {
+      get  {
+          parameters('user_id.as[Int], 'secret.as[String]) { (token, secret) => {
+            complete("not implemented")
           }
         }
       }
+    } ~
+    path("link") {
+      post {
+        entity(as[SourceLinkParameter]) { link =>
+          complete(s"$link")
+        }
+      }
+    } ~
+    pathPrefix("link" / IntNumber ) { code =>
+      pathEnd {
+        post {
+          entity(as[ClickParameter]) { click =>
+            complete(s"$click")
+          }
+        }
+      }
+    } ~
+    pathPrefix("link" / IntNumber ) { code =>
+      pathEnd {
+        get {
+          parameters('token.as[String]) { token => {
+            complete("not implemented")
+          }
+          }
+        }
+      }
+    } ~
+    pathPrefix("folder" / IntNumber ) { id =>
+      pathEnd {
+        get {
+          parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
+            complete("not implemented")
+          }
+        }
+      }
+    } ~
+    path("link") {
+      get {
+        parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
+          complete("not implemented")
+        }
+      }
+    } ~
+    path("folder") {
+      get {
+        parameters('token.as[String]) { token =>
+          complete("not implemented")
+        }
+      }
+    } ~
+    pathPrefix("link" / Segment) {
+      code =>
+        pathSuffix("clicks") {
+          get {
+            complete(code.toString)
+          }
+        }
+    }
 
   ////////////// helpers //////////////
 
