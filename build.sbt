@@ -1,4 +1,4 @@
-name := """urls-shortener-spray"""
+name := """urls-shortened-spray"""
 
 version := "1.0"
 
@@ -31,6 +31,12 @@ libraryDependencies ++= Seq(
     ,"com.github.tototoshi"   %% "slick-joda-mapper"    % "1.2.0"
     // slick-pg - additional data types mapping
     ,"com.github.tminglei"    %% "slick-pg"             % "0.6.5.3"
+    // validator
+    ,"commons-validator"      % "commons-validator"     % "1.4.0"
+    ,"commons-codec"          % "commons-codec"         % "1.9"
+    // base62
+    ,"com.timesprint" %% "hashids-scala" % "1.0.0"
+//    ,"com.github.tototoshi" %% "scala-base62" % "0.1.0"
 )
 
 

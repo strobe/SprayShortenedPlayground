@@ -1,9 +1,9 @@
-package cc.evgeniy.shortener
+package cc.evgeniy.shortened
 
 import org.joda.time._
 import org.joda.time.DateTime
 //import scala.slick.driver.PostgresDriver.simple._
-import cc.evgeniy.shortener.ExtendedPostgresDriver.simple._
+import cc.evgeniy.shortened.ExtendedPostgresDriver.simple._
 import com.github.tototoshi.slick.PostgresJodaSupport._
 import com.github.tminglei.slickpg._
 

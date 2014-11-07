@@ -1,4 +1,4 @@
-package cc.evgeniy.shortener
+package cc.evgeniy.shortened
 
 import akka.actor._
 import _root_.akka.io.IO
@@ -16,7 +16,7 @@ import scala.concurrent.duration._
 import akka.pattern.ask
 
 //import scala.slick.driver.PostgresDriver.simple._
-import cc.evgeniy.shortener.ExtendedPostgresDriver.simple._
+import cc.evgeniy.shortened.ExtendedPostgresDriver.simple._
 import com.github.tototoshi.slick.PostgresJodaSupport._
 
 import scala.slick.lifted
@@ -30,10 +30,10 @@ object Hello {
 
     // loading configuration
     val config    = ConfigFactory.load()
-    val user      = config.getString("urls-shortener.db.default.user")
-    val password  = config.getString("urls-shortener.db.default.password")
-    val driver    = config.getString("urls-shortener.db.default.driver")
-    val url       = config.getString("urls-shortener.db.default.url")
+    val user      = config.getString("urls-shortened.db.default.user")
+    val password  = config.getString("urls-shortened.db.default.password")
+    val driver    = config.getString("urls-shortened.db.default.driver")
+    val url       = config.getString("urls-shortened.db.default.url")
 
 
     Database.forURL(url, driver = driver, user = user, password = password) withSession {
@@ -69,7 +69,7 @@ object Hello {
 /**
  * Main entry point of app
  */
-object AkkaSprayScalaExample extends App {
+object ShortenedServerApp extends App {
   implicit val system = ActorSystem("spray-streamer-system")
 
   // server actor initialization

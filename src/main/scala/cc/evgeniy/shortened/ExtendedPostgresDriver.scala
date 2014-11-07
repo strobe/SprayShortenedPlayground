@@ -1,4 +1,4 @@
-package cc.evgeniy.shortener
+package cc.evgeniy.shortened
 
 import slick.driver.PostgresDriver
 import com.github.tminglei.slickpg._
