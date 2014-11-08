@@ -1,4 +1,5 @@
 import cc.evgeniy.shortened.ShortenedServerService
+import com.typesafe.config.ConfigFactory
 import org.specs2._
 import org.specs2.mutable.Specification
 import spray.http.MediaTypes._
@@ -10,8 +11,7 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
 
   def actorRefFactory = system // connect the DSL to the test ActorSystem
 
-  val user_id   = "324"
-  val secret    = "fdsfdsf"
+  val user_id   = 5646547L
   val token     = "92837498732"
   val url       = "http://www.google.com"
   val referer   = "wewe"
@@ -20,11 +20,26 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
   val limit     = "25"
   val code      = "324324"
 
+  val hash: String = hashids.encode(user_id)
+
+  // loading configuration
+  val config         = ConfigFactory.load()
+  val secret: String = config.getString("urls_service.secret")
+
   "The service" should {
 
     "return a 'PONG' response for GET requests to /ping" in {
       Get("/ping") ~> apiRoute ~> check {
         responseAs[String] === "PONG"
+      }
+    }
+
+    s"return a '$hash' in Json response for GET requests to /token" in {
+      Get(s"/token?user_id=$user_id&secret=$secret") ~> apiRoute ~> check {
+        contentType.toString must contain("application/json")
+        //Check http status
+        status === OK
+        responseAs[String] must contain(hash.toString)
       }
     }
 

@@ -1,17 +1,25 @@
 package cc.evgeniy.shortened
 
+//import _root_.MyJsonProtocol._
 import akka.actor._
 import _root_.akka.io.IO
 import akka.util.Timeout
+
+import org.hashids.Hashids
+
 import org.joda.time._
 import org.joda.time.DateTime
 import spray.can.Http
-import spray.http.HttpEntity
+import spray.http.{HttpResponse, HttpEntity}
 import spray.http.MediaTypes._
+import spray.http.StatusCode._
 import spray.httpx.SprayJsonSupport
 import spray.json.DefaultJsonProtocol
+import spray.routing
 import spray.routing.HttpService
 import spray.json._
+import spray.routing.authentication.BasicAuth
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import akka.pattern.ask
 
@@ -77,6 +85,26 @@ object ShortenedServerApp extends App {
 
   // http initialization
   IO(Http) ! Http.Bind(service, interface = "localhost", port = 8080)
+
+
+}
+
+object Dao {
+  // loading configuration
+  val config         = ConfigFactory.load()
+  //
+  val secret: String = config.getString("urls_service.secret")
+  // db
+  val user      = config.getString("urls_service.db_user")
+  val password  = config.getString("urls_service.db_password")
+  val driver    = config.getString("urls_service.db_driver")
+  val url       = config.getString("urls_service.db_url")
+
+  val db = Database.forURL(url, driver = driver, user = user, password = password)
+//  db withSession {
+//    implicit session =>
+//      println("connected to DB")
+//  }
 }
 
 /**
@@ -110,13 +138,18 @@ object RequestParams {
 }
 
 
+trait UsersHashIDs{
+  val hashids = Hashids("some salt", 0, "0123456789abcdef")
+}
+
 /**
  * Server trait.
  * this trait defines our service behavior independently from the service actor
  */
-trait ShortenedServerService extends HttpService {
+trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec {
   import RequestParams._
   import RequestParams.SourceLinkJsonSupport._
+  import Dao._
 
   // These implicit values allow us to use futures
   // in this trait.
@@ -125,6 +158,8 @@ trait ShortenedServerService extends HttpService {
 
   //  Our worker Actor handles the work of the request.
 //  val streamer = actorRefFactory.actorOf(Props[StreamerActor], "streamerActor")
+
+  def uuid = java.util.UUID.randomUUID.toString
 
   val apiRoute =
     path("") {
@@ -153,14 +188,12 @@ trait ShortenedServerService extends HttpService {
     } ~
     /// API ///
     path("token") {
-      get  {
-          parameters('user_id.as[Int], 'secret.as[String]) { (token, secret) => {
-            complete("not implemented")
-          }
-        }
-      }
+      get { parameters('user_id.as[Int], 'secret.as[String]) { (user_id, secret) =>
+        Dao.secret match { case Dao.secret =>
+          makeTokenResponse(user_id)
+        }}}
     } ~
-    pathPrefix("link") {
+      pathPrefix("link") {
       pathEnd {
         post {
           entity(as[SourceLinkParameter]) { link =>
@@ -215,6 +248,30 @@ trait ShortenedServerService extends HttpService {
     }
 
   ////////////// helpers //////////////
+
+  def makeTokenResponse(user_id: Int): routing.Route = {
+    val hash: String = hashids.encode(user_id)
+    var result = ""
+
+    db withSession { implicit session =>
+      val r: Seq[Users#TableElementType] = TableQuery[Users].filter(_.token === hash).run
+      r.isEmpty match {
+        case false => {
+          println("non empty")
+          respondWithMediaType(`application/json`) {
+            complete(JsObject("token" -> JsString(r.seq.head.token)).prettyPrint)
+          }
+        }
+        case true => {
+          println("empty")
+          Users insert User(None, hash)
+          respondWithMediaType(`application/json`) {
+            complete(JsObject("token" -> JsString(hash)).prettyPrint)
+          }
+        }
+      }
+    }
+  }
 
   lazy val index =
     HttpEntity(`text/html`,
