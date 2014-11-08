@@ -14,15 +14,16 @@ libraryDependencies ++= Seq(
     ,"com.typesafe.akka"      %% "akka-actor"           % akkaVersion withSources() withJavadoc()
     ,"com.typesafe.akka"      %% "akka-testkit"         % akkaVersion
     // Spray
-    ,"io.spray"               %  "spray-can_2.11"       % sprayVersion withSources() withJavadoc()
-    ,"io.spray"               %  "spray-httpx_2.11"       % sprayVersion withSources() withJavadoc()
-    ,"io.spray"               %  "spray-client_2.11"    % sprayVersion withSources() withJavadoc()
-    ,"io.spray"               %  "spray-routing_2.11"   % sprayVersion withSources() withJavadoc()
-    ,"io.spray"               %  "spray-testkit_2.11"   % sprayVersion % "test"
-    ,"io.spray"               %% "spray-json"           % "1.3.1"
+    ,"io.spray"               %%  "spray-http"          % sprayVersion withSources() withJavadoc()
+    ,"io.spray"               %%  "spray-can"           % sprayVersion withSources() withJavadoc()
+    ,"io.spray"               %%  "spray-httpx"         % sprayVersion withSources() withJavadoc()
+    ,"io.spray"               %%  "spray-client"        % sprayVersion withSources() withJavadoc()
+    ,"io.spray"               %%  "spray-routing"       % sprayVersion withSources() withJavadoc()
+    ,"io.spray"               %%  "spray-testkit"       % sprayVersion % "test"
+    ,"io.spray"               %%  "spray-json"          % "1.3.1"
     // Database
     ,"org.postgresql"         %  "postgresql"           % "9.2-1002-jdbc4"
-    ,"com.typesafe.slick"     %% "slick"                % "2.1.0"
+    ,"com.typesafe.slick"     %% "slick"                % "2.1.0" withSources() withJavadoc()
     ,"org.slf4j"              %  "slf4j-nop"            % "1.6.4"
     ,"org.specs2"             %% "specs2"               % "2.4.2" % "test"
     // Slick Joda Mapper
@@ -35,7 +36,7 @@ libraryDependencies ++= Seq(
     ,"commons-validator"      % "commons-validator"     % "1.4.0"
     ,"commons-codec"          % "commons-codec"         % "1.9"
     // base62
-    ,"com.timesprint" %% "hashids-scala" % "1.0.0"
+    ,"com.timesprint"         %% "hashids-scala" % "1.0.0"
 //    ,"com.github.tototoshi" %% "scala-base62" % "0.1.0"
 )
 

@@ -12,7 +12,6 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
   def actorRefFactory = system // connect the DSL to the test ActorSystem
 
   val user_id   = 5646547L
-  val token     = "92837498732"
   val url       = "http://www.google.com"
   val referer   = "wewe"
   val remote_ip = "10.10.0.22"
@@ -20,7 +19,7 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
   val limit     = "25"
   val code      = "324324"
 
-  val hash: String = hashids.encode(user_id)
+  val token: String = hashids.encode(user_id)
 
   // loading configuration
   val config         = ConfigFactory.load()
@@ -34,12 +33,12 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
       }
     }
 
-    s"return a '$hash' in Json response for GET requests to /token" in {
+    s"return a '$token' in Json response for GET requests to /token" in {
       Get(s"/token?user_id=$user_id&secret=$secret") ~> apiRoute ~> check {
-        contentType.toString must contain("application/json")
         //Check http status
         status === OK
-        responseAs[String] must contain(hash.toString)
+        contentType.toString must contain("application/json")
+        responseAs[String] must contain(token.toString)
       }
     }
 
@@ -50,6 +49,8 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
         HttpEntity(`application/json`, body)) ~> apiRoute ~> check {
         //Check http status
         status === OK
+        contentType.toString must contain("application/json")
+        responseAs[String] must contain(url)
       }
     }
 

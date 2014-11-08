@@ -10,11 +10,11 @@ import com.github.tminglei.slickpg._
 
 /// User ///
 // mapped User type
-case class User(id: Option[Int], token: String)
+case class User(id: Option[Long], token: String)
 
 // Definition of the 'Users' table
 class Users(tag: Tag) extends Table[User](tag, "Users") {
-  def id    = column[Int]("user_id", O.PrimaryKey, O.AutoInc) // This is the primary key column
+  def id    = column[Long]("user_id", O.PrimaryKey, O.AutoInc) // This is the primary key column
   def token = column[String]("token")
 
   // Every table needs a * projection with the same type as the table's type parameter
@@ -30,12 +30,12 @@ object Users extends TableQuery(new Users(_)) {
 
 /// Folder ///
 // mapped Folder type
-case class Folder(id: Option[Int], user_id: Int, title: String)
+case class Folder(id: Option[Int], user_id: Long, title: String)
 
 // Definition of the 'Users' table
 class Folders(tag: Tag) extends Table[Folder](tag, "Folders") {
   def id      = column[Int]("folder_id", O.PrimaryKey, O.AutoInc) // This is the primary key column
-  def user_id = column[Int]("user_id", O.NotNull) // foreign key
+  def user_id = column[Long]("user_id", O.NotNull) // foreign key
   def title   = column[String]("title")
 
   // Every table needs a * projection with the same type as the table's type parameter
@@ -55,12 +55,12 @@ object Folders extends TableQuery(new Folders(_)) {
 
 /// Link ///
 // mapped Link type
-case class Link(id: Option[Int], user_id: Int, url: String, code: String)
+case class Link(id: Option[Int], user_id: Long, url: String, code: String)
 
 // Definition of the 'Users' table
 class Links(tag: Tag) extends Table[Link](tag, "Links") {
   def id      = column[Int]("link_id", O.PrimaryKey, O.AutoInc) // This is the primary key column
-  def user_id = column[Int]("user_id", O.NotNull) // foreign key
+  def user_id = column[Long]("user_id", O.NotNull) // foreign key
   def url     = column[String]("url")
   def code    = column[String]("code")
 

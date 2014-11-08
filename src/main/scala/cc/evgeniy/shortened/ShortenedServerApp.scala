@@ -10,14 +10,13 @@ import org.hashids.Hashids
 import org.joda.time._
 import org.joda.time.DateTime
 import spray.can.Http
-import spray.http.{HttpResponse, HttpEntity}
+import spray.http.{StatusCode, HttpResponse, HttpEntity}
 import spray.http.MediaTypes._
 import spray.http.StatusCode._
 import spray.httpx.SprayJsonSupport
-import spray.json.DefaultJsonProtocol
-import spray.routing
-import spray.routing.HttpService
 import spray.json._
+import spray.routing
+import spray.routing.{Route, HttpService}
 import spray.routing.authentication.BasicAuth
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -190,21 +189,21 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
     path("token") {
       get { parameters('user_id.as[Int], 'secret.as[String]) { (user_id, secret) =>
         Dao.secret match { case Dao.secret =>
-          makeTokenResponse(user_id)
+          doTokenResponse(user_id)
         }}}
     } ~
-      pathPrefix("link") {
+    pathPrefix("link") {
       pathEnd {
         post {
           entity(as[SourceLinkParameter]) { link =>
-            complete(s"$link")
+            doLinkResponse(link)
           }
         } ~
-        get {
-          parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
-            complete("not implemented")
+          get {
+            parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
+              complete("not implemented")
+            }
           }
-        }
       } ~
       pathPrefix(Segment) { code =>
         pathEnd {
@@ -216,59 +215,177 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
                 complete(s"$link")
               }
           } ~
-          get {
-            parameters('token.as[String]) { token =>
-              complete("not implemented")
+            get {
+              parameters('token.as[String]) { token =>
+                complete("not implemented")
+              }
+            }
+        } ~
+          pathSuffix("clicks") {
+            get {
+              complete(code.toString)
             }
           }
-
-        } ~
-        pathSuffix("clicks") {
-          get {
-            complete(code.toString)
-          }
+      }
+  } ~
+  path("folder") {
+    pathEnd {
+      get {
+        parameters('token.as[String]) { token =>
+          complete("not implemented")
         }
       }
     } ~
-    path("folder") {
-      pathEnd {
-        get {
-          parameters('token.as[String]) { token =>
-            complete("not implemented")
+    pathSuffix(LongNumber) { id =>
+      get {
+        parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
+          complete("not implemented")
+        }
+      }
+    }
+  }
+
+  ////////////// responses //////////////
+
+  def doLinkResponse(link: SourceLinkParameter): Route = {
+    isLinkExist(link.token, link.url) match {
+      case true => {
+        val l = getLink(link.token, link.url)
+
+        completeLinkAsJson(l.url, l.code)
+      }
+      case false => {
+        val user_id = getUserId(link.token)
+        val code = makeNewUrlCode(link.token, link.url)
+
+        addNewLink(link.token, link.url, code)
+        completeLinkAsJson(link.url, code)
+      }
+    }
+  }
+
+  def doTokenResponse(user_id: Int): routing.Route = {
+    val token: String = hashids.encode(user_id)
+
+    db withSession { implicit session =>
+      val query = TableQuery[Users].filter(_.token === token).run
+      query.isEmpty match {
+        case false => {
+          respondWithMediaType(`application/json`) {
+            complete(JsObject("token" -> JsString(query.seq.head.token)).prettyPrint)
           }
         }
-      } ~
-      pathSuffix(LongNumber) { id =>
-        get {
-          parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
-            complete("not implemented")
+        case true => {
+          Users insert User(None, token)
+          respondWithMediaType(`application/json`) {
+            complete(JsObject("token" -> JsString(token)).prettyPrint)
           }
         }
       }
     }
+  }
 
   ////////////// helpers //////////////
 
-  def makeTokenResponse(user_id: Int): routing.Route = {
-    val hash: String = hashids.encode(user_id)
-    var result = ""
+  def completeLinkAsJson(url: String, code: String) = {
+    respondWithMediaType(`application/json`) {
+      complete(JsObject("link" -> JsObject(
+        "url" -> JsString(url),
+        "code" -> JsString(code)
+      )).prettyPrint)
+    }
+  }
 
+
+  def isUserTokenCorrect(token: String) = {
     db withSession { implicit session =>
-      val r: Seq[Users#TableElementType] = TableQuery[Users].filter(_.token === hash).run
-      r.isEmpty match {
+      val query: Seq[Users#TableElementType] = TableQuery[Users].filter(_.token === token).run
+      query.isEmpty match {
         case false => {
-          println("non empty")
-          respondWithMediaType(`application/json`) {
-            complete(JsObject("token" -> JsString(r.seq.head.token)).prettyPrint)
-          }
+          true
         }
         case true => {
-          println("empty")
-          Users insert User(None, hash)
-          respondWithMediaType(`application/json`) {
-            complete(JsObject("token" -> JsString(hash)).prettyPrint)
-          }
+          false
         }
+      }
+    }
+  }
+
+
+  def isLinkExist(token: String, url: String) = {
+    db withSession { implicit session =>
+      // geting link which has a same url
+      val existLink = (for {
+        u <- Users if u.token === token
+        l <- Links if l.user_id === u.id
+      } yield l).filter(_.url === url)
+
+      existLink.run.isEmpty match {
+        case true => false
+        case false => true
+      }
+    }
+  }
+
+
+  def addNewLink(token: String, url: String, code: String) = {
+    db withSession { implicit session =>
+      val user: User = (for {
+        u <- Users if u.token === token
+      } yield u).run.head
+
+      Links insert Link(None, user.id.get, url, code)
+    }
+  }
+
+
+  def makeNewUrlCode(token: String, url: String): String = {
+    db withSession { implicit session =>
+      val userLinks: Seq[Link] = (for {
+        u <- Users if u.token === token
+        l <- Links if l.user_id === u.id
+      } yield l).sortBy(_.code.asc).run
+
+      val last: Option[Long] = userLinks.length > 0 match {
+        case true => {
+          val l: Link = userLinks.head
+          val s: String = l.code
+          decode(s).headOption
+        }
+        case false => None
+      }
+      last match {
+        case Some(id) =>
+          encode(id + 1L)
+        case None =>
+          encode(1L)
+      }
+    }
+  }
+
+  def getUrlCode(url: String) = {
+
+  }
+
+  def getUserId(token: String): Long = {
+    hashids.decode(token).head
+  }
+
+  def getToken(user_id: Long): String = {
+    hashids.encode(user_id)
+  }
+
+  def getLink(token: String, url: String): Link = {
+    db withSession { implicit session =>
+      // geting link which has a same url
+      val q = for {
+        u <- Users if u.token === token
+        l <- Links if l.user_id === u.id && l.url === url
+      } yield l
+
+      val r =  q.run
+        r.isEmpty match {
+        case false => r.head
       }
     }
   }
