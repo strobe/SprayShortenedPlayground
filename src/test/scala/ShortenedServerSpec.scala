@@ -6,6 +6,8 @@ import spray.http.MediaTypes._
 import spray.testkit.Specs2RouteTest
 import spray.http._
 import StatusCodes._
+import spray.json._
+import DefaultJsonProtocol._
 
 class ShortenedServerSpec extends Specification with Specs2RouteTest with ShortenedServerService {
 
@@ -13,11 +15,10 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
 
   val user_id   = 5646547L
   val url       = "http://www.google.com"
-  val referer   = "wewe"
+  val referer   = "referer"
   val remote_ip = "10.10.0.22"
   val offset    = "0"
   val limit     = "25"
-  val code      = "324324"
 
   val token: String = hashids.encode(user_id)
 
@@ -42,8 +43,20 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
       }
     }
 
-    "POST to '/link' path with token, url, code [opt], folder_id [opt] params params" in {
-      val body = s"""{\"token\": \"$token\", \"url\": \"$url\", \"code\": $code  }"""
+    "POST to '/link' path with token, url params" in {
+      val send_body = s"""{\"token\": \"$token\", \"url\": \"$url\"  }"""
+
+      Post("/link",
+        HttpEntity(`application/json`, send_body)) ~> apiRoute ~> check {
+        //Check http status
+        status === OK
+        contentType.toString must contain("application/json")
+        responseAs[String] must contain(url)
+      }
+    }
+
+    "POST to '/link' path with token, url, code [opt] params" in {
+      val body = s"""{\"token\": \"$token\", \"url\": \"$url\", \"code\": "usercode@" }"""
 
       Post("/link",
         HttpEntity(`application/json`, body)) ~> apiRoute ~> check {
@@ -54,12 +67,26 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
       }
     }
 
+
     "POST to '/link/$code' path with referer, remote_ip params" in {
-      Post("/link/876786876",
+      val send_body = s"""{\"token\": \"$token\", \"url\": \"$url\"  }"""
+      var code = ""
+
+      Post("/link",
+        HttpEntity(`application/json`, send_body)) ~> apiRoute ~> check {
+        val jsonAst = body.data.asString.parseJson
+        code = jsonAst.asJsObject.fields("link").asJsObject.fields("code") match {
+          case JsString(code) => code
+        }
+      }
+
+      Post(s"/link/$code",
         HttpEntity(`application/json`,
           s"""{\"referer\": \"$referer\", \"remote_ip\": \"$remote_ip\"}""")) ~> apiRoute ~> check {
+        println(body.toString)
+        println(headers.toString)
         //Check http status
-        status === OK
+        status === PermanentRedirect
       }
     }
 

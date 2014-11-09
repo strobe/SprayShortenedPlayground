@@ -4,20 +4,21 @@ package cc.evgeniy.shortened
 import akka.actor._
 import _root_.akka.io.IO
 import akka.util.Timeout
+import com.github.tminglei.slickpg.InetString
 
 import org.hashids.Hashids
 
-import org.joda.time._
-import org.joda.time.DateTime
 import spray.can.Http
 import spray.http.{StatusCode, HttpResponse, HttpEntity}
+import spray.http.StatusCodes._
 import spray.http.MediaTypes._
-import spray.http.StatusCode._
 import spray.httpx.SprayJsonSupport
 import spray.json._
 import spray.routing
 import spray.routing.{Route, HttpService}
 import spray.routing.authentication.BasicAuth
+import org.joda.time.DateTime
+import org.joda.time._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import akka.pattern.ask
@@ -126,7 +127,7 @@ class ShortenedServerActor extends Actor with ShortenedServerService with ActorL
 
 object RequestParams {
   // {"token": "12341", "url": "http://", "code": 21}
-  case class SourceLinkParameter(token: String, url: String, code: Option[Int], folderId: Option[Int])
+  case class SourceLinkParameter(token: String, url: String, code: Option[String], folderId: Option[Int])
   // {"referer": "12341", "remote_ip": "10.10.0.1"}
   case class ClickParameter(referer: String, remote_ip: String)
 
@@ -149,6 +150,7 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
   import RequestParams._
   import RequestParams.SourceLinkJsonSupport._
   import Dao._
+
 
   // These implicit values allow us to use futures
   // in this trait.
@@ -199,21 +201,20 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
             doLinkResponse(link)
           }
         } ~
-          get {
-            parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
-              complete("not implemented")
-            }
+        get {
+          parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
+            complete("not implemented")
           }
+        }
       } ~
       pathPrefix(Segment) { code =>
         pathEnd {
           post {
             entity(as[ClickParameter]) { click =>
-              complete(s"$click")
-            } ~
-              entity(as[SourceLinkParameter]) { link =>
-                complete(s"$link")
-              }
+              val clicks = addNewClicks(code, click.referer, click.remote_ip)
+
+              redirect(s"/link/${clicks.head}", PermanentRedirect)
+            }
           } ~
             get {
               parameters('token.as[String]) { token =>
@@ -250,19 +251,20 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
   def doLinkResponse(link: SourceLinkParameter): Route = {
     isLinkExist(link.token, link.url) match {
       case true => {
-        val l = getLink(link.token, link.url)
-
-        completeLinkAsJson(l.url, l.code)
+        getLink(link.token, link.url) match {
+          case Some(l) => completeLinkAsJson (l.url, l.code)
+          case None    => complete(HttpResponse(NotFound))
+        }
       }
       case false => {
         val user_id = getUserId(link.token)
-        val code = makeNewUrlCode(link.token, link.url)
+        val newLink = addNewHashLink(link.token, link.url)
 
-        addNewLink(link.token, link.url, code)
-        completeLinkAsJson(link.url, code)
+        completeLinkAsJson(newLink.url, newLink.code)
       }
     }
   }
+
 
   def doTokenResponse(user_id: Int): routing.Route = {
     val token: String = hashids.encode(user_id)
@@ -284,6 +286,7 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
       }
     }
   }
+
 
   ////////////// helpers //////////////
 
@@ -328,32 +331,72 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
   }
 
 
-  def addNewLink(token: String, url: String, code: String) = {
+  def addNewHashLink(token: String, url: String): Link = {
+    val code = makeNewUrlCode(token, url)
+
     db withSession { implicit session =>
       val user: User = (for {
         u <- Users if u.token === token
       } yield u).run.head
 
-      Links insert Link(None, user.id.get, url, code)
+      val link = Link(None, user.id.get, url, code, false)
+      Links insert link
+      link
     }
   }
 
 
-  def makeNewUrlCode(token: String, url: String): String = {
+  def addNewUserLink(token: String, url: String, code: String): Link = {
     db withSession { implicit session =>
-      val userLinks: Seq[Link] = (for {
+      val user: User = (for {
         u <- Users if u.token === token
-        l <- Links if l.user_id === u.id
-      } yield l).sortBy(_.code.asc).run
+      } yield u).run.head
 
-      val last: Option[Long] = userLinks.length > 0 match {
+      val link = Link(None, user.id.get, url, code, true)
+      Links insert link
+      link
+    }
+  }
+
+
+  def addNewClicks(code: String, referer: String, remote_ip: String): Seq[Click] = {
+    db withSession { implicit session =>
+      val links: Seq[Link] = (for {
+        l <- Links if l.code === code
+      } yield l).run
+
+      val clicks: Seq[Click] = for {
+        l <- links
+      } yield {
+        val click = Click(None, l.id.get, DateTime.now, referer, InetString(remote_ip))
+        Clicks insert click
+        click
+      }
+      clicks
+    }
+  }
+
+
+  def makeNewUrlCode(token: String,
+                     url: String,
+                     isUserLink: Boolean = false,
+                     userLink: Option[String] = None): String = {
+    db withSession { implicit session =>
+      // get hash links which user has
+      val links: Seq[Link] = (for {
+        u <- Users if u.token === token
+        l <- Links if l.user_id === u.id && l.is_user_link === false
+      } yield l).sortBy(_.code.asc).run
+      // get last link number
+      val last: Option[Long] = links.length > 0 match {
         case true => {
-          val l: Link = userLinks.head
+          val l: Link = links.head
           val s: String = l.code
           decode(s).headOption
         }
         case false => None
       }
+      // return intit code if no any link doesn't exist and new if exist
       last match {
         case Some(id) =>
           encode(id + 1L)
@@ -363,19 +406,32 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
     }
   }
 
-  def getUrlCode(url: String) = {
 
+  def getUrlCode(url: String): Option[String] = {
+    db withSession { implicit session =>
+      val links = (for {
+        l <- Links if l.url === url
+      } yield l).run
+
+      links.isEmpty match {
+        case true => None
+        case false => Some(links.head.code)
+      }
+    }
   }
+
 
   def getUserId(token: String): Long = {
     hashids.decode(token).head
   }
 
+
   def getToken(user_id: Long): String = {
     hashids.encode(user_id)
   }
 
-  def getLink(token: String, url: String): Link = {
+
+  def getLink(token: String, url: String): Option[Link] = {
     db withSession { implicit session =>
       // geting link which has a same url
       val q = for {
@@ -384,11 +440,13 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
       } yield l
 
       val r =  q.run
-        r.isEmpty match {
-        case false => r.head
+      r.isEmpty match {
+        case false => Some(r.head)
+        case true => None
       }
     }
   }
+
 
   lazy val index =
     HttpEntity(`text/html`,

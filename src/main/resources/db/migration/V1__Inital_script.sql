@@ -18,7 +18,8 @@ CREATE TABLE "Links"
     link_id BIGSERIAL PRIMARY KEY NOT NULL,
     user_id BIGSERIAL REFERENCES "Users" (user_id),
     url TEXT,
-    code TEXT
+    code TEXT,
+    is_user_link BOOL
 );
 
 CREATE TABLE "Clicks"

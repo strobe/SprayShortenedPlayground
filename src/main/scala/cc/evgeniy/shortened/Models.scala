@@ -55,17 +55,18 @@ object Folders extends TableQuery(new Folders(_)) {
 
 /// Link ///
 // mapped Link type
-case class Link(id: Option[Int], user_id: Long, url: String, code: String)
+case class Link(id: Option[Int], user_id: Long, url: String, code: String, is_user_link: Boolean)
 
 // Definition of the 'Users' table
 class Links(tag: Tag) extends Table[Link](tag, "Links") {
-  def id      = column[Int]("link_id", O.PrimaryKey, O.AutoInc) // This is the primary key column
-  def user_id = column[Long]("user_id", O.NotNull) // foreign key
-  def url     = column[String]("url")
-  def code    = column[String]("code")
+  def id           = column[Int]("link_id", O.PrimaryKey, O.AutoInc) // This is the primary key column
+  def user_id      = column[Long]("user_id", O.NotNull) // foreign key
+  def url          = column[String]("url")
+  def code         = column[String]("code")
+  def is_user_link = column[Boolean]("is_user_link")
 
   // Every table needs a * projection with the same type as the table's type parameter
-  def * = (id.?, user_id, url, code) <> ((Link.apply _).tupled, Link.unapply)
+  def * = (id.?, user_id, url, code, is_user_link) <> ((Link.apply _).tupled, Link.unapply)
 
   // foreign keys
   def userFK = foreignKey("USER_FK_CONS", user_id, Users)(_.id)
