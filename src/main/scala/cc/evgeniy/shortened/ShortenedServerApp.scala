@@ -198,11 +198,13 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
       pathEnd {
         post {
           entity(as[SourceLinkParameter]) { link =>
+            // TODO: parametrs validation
             doLinkResponse(link)
           }
         } ~
         get {
           parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
+            // TODO:
             complete("not implemented")
           }
         }
@@ -260,7 +262,10 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
         val user_id = getUserId(link.token)
         val newLink = addNewHashLink(link.token, link.url)
 
-        completeLinkAsJson(newLink.url, newLink.code)
+        newLink match {
+          case Some(l) => completeLinkAsJson(l.url, l.code)
+          case None => complete(HttpResponse(UnprocessableEntity))
+        }
       }
     }
   }
@@ -331,30 +336,29 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
   }
 
 
-  def addNewHashLink(token: String, url: String): Link = {
+  def addNewHashLink(token: String, url: String): Option[Link] = {
     val code = makeNewUrlCode(token, url)
 
-    db withSession { implicit session =>
-      val user: User = (for {
-        u <- Users if u.token === token
-      } yield u).run.head
-
-      val link = Link(None, user.id.get, url, code, false)
-      Links insert link
-      link
-    }
+    addNewUserLink(token, url, code)
   }
 
 
-  def addNewUserLink(token: String, url: String, code: String): Link = {
+  def addNewUserLink(token: String, url: String, code: String): Option[Link] = {
     db withSession { implicit session =>
-      val user: User = (for {
+      val user: Option[User] = (for {
         u <- Users if u.token === token
-      } yield u).run.head
+      } yield u).run.headOption
 
-      val link = Link(None, user.id.get, url, code, true)
-      Links insert link
-      link
+      user match {
+        case Some(user) => {
+          val link = Link(None, user.id.get, url, code, false)
+          Links insert link
+          Some(link)
+        }
+        case None => {
+          None
+        }
+      }
     }
   }
 

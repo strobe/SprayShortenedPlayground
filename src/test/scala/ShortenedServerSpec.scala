@@ -72,6 +72,7 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
       val send_body = s"""{\"token\": \"$token\", \"url\": \"$url\"  }"""
       var code = ""
 
+      // getting the code of link
       Post("/link",
         HttpEntity(`application/json`, send_body)) ~> apiRoute ~> check {
         val jsonAst = body.data.asString.parseJson
@@ -80,6 +81,7 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
         }
       }
 
+      // actual test case
       Post(s"/link/$code",
         HttpEntity(`application/json`,
           s"""{\"referer\": \"$referer\", \"remote_ip\": \"$remote_ip\"}""")) ~> apiRoute ~> check {
