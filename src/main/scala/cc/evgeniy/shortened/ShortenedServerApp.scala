@@ -204,7 +204,7 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
         } ~
         get {
           parameters('token.as[String], 'offset ? 0, 'limit ? 25) { (token, offset, limit) =>
-            doGetLinkResponse(token, offset, limit)
+            doGetLinksResponse(token, offset, limit)
           }
         }
       } ~
@@ -212,16 +212,16 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
         pathEnd {
           post {
             entity(as[ClickParameter]) { click =>
+              // TODO: parameters validation
               val clicks = addNewClicks(code, click.referer, click.remote_ip)
-
               redirect(s"/link/${clicks.head}", PermanentRedirect)
             }
           } ~
-            get {
-              parameters('token.as[String]) { token =>
-                complete("not implemented")
-              }
+          get {
+            parameters('token.as[String]) { token =>
+              doGetLinkResponse(token, code)
             }
+          }
         } ~
           pathSuffix("clicks") {
             get {
@@ -249,7 +249,33 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
 
   ////////////// responses //////////////
 
-  def doGetLinkResponse(token: String, offset: Int, limit: Int): Route = {
+  def doGetLinkResponse(token: String, code: String): Route = {
+    db withSession { implicit session =>
+      val link : Option[Link] = (for {
+        u <- Users if u.token === token
+        l <- Links if l.user_id === u.id && l.code === code
+      } yield l).run.headOption
+
+      link match {
+        case Some(l) => {
+          respondWithMediaType(`application/json`) {
+            complete(JsObject("link" -> JsObject(
+              "url" -> JsString(l.url),
+              "code" -> JsString(l.code))//,
+//              "folder" -> JsString(l),
+//              "clicks" -> JsNumber()
+            ).prettyPrint)
+          }
+        }
+        case None => complete(HttpResponse(NotFound))
+      }
+
+
+    }
+  }
+
+
+  def doGetLinksResponse(token: String, offset: Int, limit: Int): Route = {
     val offset0 = if (offset > 0) offset else 0
     val limit0 = if (limit > 0) limit else 25
 
@@ -267,6 +293,7 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
       complete(JsObject("links" -> jsonLinks.toJson))
     }
   }
+
 
   def doPostLinkResponse(link: SourceLinkParameter): Route = {
     isLinkExist(link.token, link.url) match {

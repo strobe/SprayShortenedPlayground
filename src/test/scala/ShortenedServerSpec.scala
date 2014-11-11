@@ -93,9 +93,23 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
     }
 
     "GET to '/link/$code' path with token" in {
-      Get(s"/link/876786876?token=$token") ~> apiRoute ~> check {
+      val send_body = s"""{\"token\": \"$token\", \"url\": \"$url\"  }"""
+      var code = ""
+
+      // getting the code of link
+      Post("/link",
+        HttpEntity(`application/json`, send_body)) ~> apiRoute ~> check {
+        val jsonAst = body.data.asString.parseJson
+        code = jsonAst.asJsObject.fields("link").asJsObject.fields("code") match {
+          case JsString(code) => code
+        }
+      }
+
+      Get(s"/link/$code?token=$token") ~> apiRoute ~> check {
         //Check http status
         status === OK
+        contentType.toString must contain("application/json")
+        responseAs[String] must contain("link")
       }
     }
 
