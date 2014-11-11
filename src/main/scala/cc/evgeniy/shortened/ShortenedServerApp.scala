@@ -198,7 +198,7 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
       pathEnd {
         post {
           entity(as[SourceLinkParameter]) { link =>
-            // TODO: parametrs validation
+            // TODO: parameters validation
             doLinkResponse(link)
           }
         } ~
