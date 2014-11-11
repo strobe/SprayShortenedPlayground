@@ -107,9 +107,11 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
     }
 
     "GET to '/link' path with token, offset (opt = 0), limit (opt = const) params" in {
-      Get(s"/link?token=$token&offset=$offset") ~> apiRoute ~> check {
+      Get(s"/link?token=$token&limit=$limit&offset=$offset") ~> apiRoute ~> check {
         //Check http status
         status === OK
+        contentType.toString must contain("application/json")
+        responseAs[String] must contain("links")
       }
     }
 

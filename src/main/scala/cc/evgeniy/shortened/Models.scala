@@ -2,6 +2,8 @@ package cc.evgeniy.shortened
 
 import org.joda.time._
 import org.joda.time.DateTime
+import spray.json._
+
 //import scala.slick.driver.PostgresDriver.simple._
 import cc.evgeniy.shortened.ExtendedPostgresDriver.simple._
 import com.github.tototoshi.slick.PostgresJodaSupport._
@@ -56,6 +58,19 @@ object Folders extends TableQuery(new Folders(_)) {
 /// Link ///
 // mapped Link type
 case class Link(id: Option[Int], user_id: Long, url: String, code: String, is_user_link: Boolean)
+
+// Json writer
+object LinksJsonProtocol extends DefaultJsonProtocol {
+  implicit object linksFormat extends RootJsonFormat[Link] {
+
+    def write(l: Link) =
+      JsObject("url" -> JsString(l.url), "code" -> JsString(l.code))
+
+    def read(value: JsValue) = value match {
+      case _ => deserializationError("Link deserialization is not supported")
+    }
+  }
+}
 
 // Definition of the 'Users' table
 class Links(tag: Tag) extends Table[Link](tag, "Links") {

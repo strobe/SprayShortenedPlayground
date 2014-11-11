@@ -199,13 +199,12 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
         post {
           entity(as[SourceLinkParameter]) { link =>
             // TODO: parameters validation
-            doLinkResponse(link)
+            doPostLinkResponse(link)
           }
         } ~
         get {
-          parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
-            // TODO:
-            complete("not implemented")
+          parameters('token.as[String], 'offset ? 0, 'limit ? 25) { (token, offset, limit) =>
+            doGetLinkResponse(token, offset, limit)
           }
         }
       } ~
@@ -250,7 +249,26 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
 
   ////////////// responses //////////////
 
-  def doLinkResponse(link: SourceLinkParameter): Route = {
+  def doGetLinkResponse(token: String, offset: Int, limit: Int): Route = {
+    val offset0 = if (offset > 0) offset else 0
+    val limit0 = if (limit > 0) limit else 25
+
+    val links = db withSession { implicit session =>
+      val existLinks: Seq[Link] = (for {
+        u <- Users if u.token === token
+        l <- Links if l.user_id === u.id
+      } yield l).run
+      existLinks.drop(offset0).take(limit0)
+    }
+
+    respondWithMediaType(`application/json`) {
+      import LinksJsonProtocol._
+      val jsonLinks = for {l <- links} yield l.toJson
+      complete(JsObject("links" -> jsonLinks.toJson))
+    }
+  }
+
+  def doPostLinkResponse(link: SourceLinkParameter): Route = {
     isLinkExist(link.token, link.url) match {
       case true => {
         getLink(link.token, link.url) match {
