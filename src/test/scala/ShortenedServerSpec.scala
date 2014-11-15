@@ -1,3 +1,5 @@
+import java.util.Date
+
 import cc.evgeniy.shortened.ShortenedServerService
 import com.typesafe.config.ConfigFactory
 import org.specs2._
@@ -8,6 +10,9 @@ import spray.http._
 import StatusCodes._
 import spray.json._
 import DefaultJsonProtocol._
+import util.Random._
+import org.joda.time._
+import org.joda.time.DateTime
 
 class ShortenedServerSpec extends Specification with Specs2RouteTest with ShortenedServerService {
 
@@ -67,6 +72,21 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
       }
     }
 
+    "POST to '/link' path with token, url, code [opt] and folder [opt] params" in {
+      val r = new scala.util.Random(DateTime.now().getMillis())
+      val url0 = s"https://www.akka.io/${r.nextInt().toString}"
+      val folder_id = "some_folder"
+      val body = s"""{\"token\": \"$token\", \"url\": \"$url0\", \"code\": "usercode@${r.nextInt.toString}", \"folder_id\": \"$folder_id\" }"""
+
+      Post("/link",
+        HttpEntity(`application/json`, body)) ~> apiRoute ~> check {
+        //Check http status
+        status === OK
+        contentType.toString must contain("application/json")
+        responseAs[String] must contain(url0)
+      }
+    }
+
 
     "POST to '/link/$code' path with referer, remote_ip params" in {
       val send_body = s"""{\"token\": \"$token\", \"url\": \"$url\"  }"""
@@ -110,13 +130,9 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
         status === OK
         contentType.toString must contain("application/json")
         responseAs[String] must contain("link")
-      }
-    }
-
-    "GET to '/folder/$id' path with token, offset (opt = 0), limit (opt = const) params" in {
-      Get(s"/link?token=$token&offset=$offset") ~> apiRoute ~> check {
-        //Check http status
-        status === OK
+        responseAs[String] must contain("url")
+        responseAs[String] must contain("code")
+        responseAs[String] must contain("clicks")
       }
     }
 
@@ -129,41 +145,47 @@ class ShortenedServerSpec extends Specification with Specs2RouteTest with Shorte
       }
     }
 
-    "GET to '/folder/$id' path with token, offset (opt = 0), limit (opt = const) params" in {
-      Get(s"/link?token=$token") ~> apiRoute ~> check {
+    "GET to '/folder' path with token, offset (opt = 0), limit (opt = const) params" in {
+      Get(s"/folder?token=$token") ~> apiRoute ~> check {
         //Check http status
         status === OK
+        contentType.toString must contain("application/json")
+        responseAs[String] must contain("folders")
+      }
+    }
+
+    // TODO: is a placeholder
+    "GET to '/folder/$id' path with token" in {
+      Get(s"/folder/${1}?token=$token") ~> apiRoute ~> check {
+        //Check http status
+        status === OK
+        contentType.toString must contain("application/json")
+        responseAs[String] must contain("links")
+        responseAs[String] must contain("url")
+        responseAs[String] must contain("code")
       }
     }
 
     "GET to '/link/$code/clicks' path with token, offset, limit params" in {
-      Get(s"/link?token=$token&offset=$offset&limit=$limit") ~> apiRoute ~> check {
+      val send_body = s"""{\"token\": \"$token\", \"url\": \"$url\"  }"""
+      var code = ""
+
+      // getting the code of link
+      Post("/link",
+        HttpEntity(`application/json`, send_body)) ~> apiRoute ~> check {
+        val jsonAst = body.data.asString.parseJson
+        code = jsonAst.asJsObject.fields("link").asJsObject.fields("code") match {
+          case JsString(code) => code
+        }
+      }
+
+      Get(s"/link/$code/clicks?token=$token&offset=$offset&limit=$limit") ~> apiRoute ~> check {
         //Check http status
         status === OK
+        contentType.toString must contain("application/json")
+        responseAs[String] must contain("clicks")
       }
     }
-
-
-    /*
-    "return a OK response for GET requests to the root path" in {
-      Get("/") ~> apiRoute ~> check {
-        //Check http status
-        status === OK
-        // content check
-        responseAs[String] must contain("spray-can + spray-routing")
-      }
-    }
-
-
-    "return a content-type for GET requests to the /simple_json" in {
-      Get("/simple_json") ~> apiRoute ~> check {
-        assert(contentType.mediaType.isApplication)
-
-        //Check content type
-        contentType.toString === "application/json; charset=UTF-8"
-      }
-    }
-     */
 
   }
 }

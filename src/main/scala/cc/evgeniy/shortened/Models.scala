@@ -49,6 +49,7 @@ class Folders(tag: Tag) extends Table[Folder](tag, "Folders") {
 
 // TableQuery object for adding additional functionality
 object Folders extends TableQuery(new Folders(_)) {
+  val findById = this.findBy(_.id)
   val findByTitle = this.findBy(_.title)
   val findByUserId = this.findBy(_.user_id)
 }
@@ -100,6 +101,21 @@ object Links extends TableQuery(new Links(_)) {
 // mapped User type
 case class Click(id: Option[Int], link_id: Int, date: DateTime, referer: String, remote_ip: InetString)
 
+// Json writer
+object ClicksJsonProtocol extends DefaultJsonProtocol {
+  implicit object clicksFormat extends RootJsonFormat[Click] {
+
+    def write(l: Click) =
+      JsObject("date"      -> JsString(l.date.toDateTimeISO.toString),
+               "refer"     -> JsString(l.referer),
+               "remote_ip" -> JsString(l.remote_ip.address.toString))
+
+    def read(value: JsValue) = value match {
+      case _ => deserializationError("Click deserialization is not supported")
+    }
+  }
+}
+
 // Definition of the 'Users' table
 class Clicks(tag: Tag) extends Table[Click](tag, "Clicks") {
   def id      = column[Int]("click_id", O.PrimaryKey, O.AutoInc) // This is the primary key column
@@ -128,6 +144,20 @@ object Clicks extends TableQuery(new Clicks(_)) {
 /// FolderLinks ///
 // mapped FolderLinks type
 case class FolderLink(folder_id: Int, link_id: Int)
+
+// Json writer
+object FoldersJsonProtocol extends DefaultJsonProtocol {
+  implicit object foldersFormat extends RootJsonFormat[Folder] {
+
+    def write(f: Folder) =
+      JsObject("id"      -> JsString(f.id.toString),
+               "title"   -> JsString(f.title))
+
+    def read(value: JsValue) = value match {
+      case _ => deserializationError("folder deserialization is not supported")
+    }
+  }
+}
 
 // Definition of the 'FolderLinks' table
 class FolderLinks(tag: Tag) extends Table[FolderLink](tag, "FolderLinks") {

@@ -5,6 +5,7 @@ import akka.actor._
 import _root_.akka.io.IO
 import akka.util.Timeout
 import com.github.tminglei.slickpg.InetString
+import org.apache.commons.validator.routines.UrlValidator
 
 import org.hashids.Hashids
 
@@ -22,6 +23,8 @@ import org.joda.time._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import akka.pattern.ask
+
+import scala.slick.lifted.AppliedCompiledFunction
 
 //import scala.slick.driver.PostgresDriver.simple._
 import cc.evgeniy.shortened.ExtendedPostgresDriver.simple._
@@ -127,7 +130,7 @@ class ShortenedServerActor extends Actor with ShortenedServerService with ActorL
 
 object RequestParams {
   // {"token": "12341", "url": "http://", "code": 21}
-  case class SourceLinkParameter(token: String, url: String, code: Option[String], folderId: Option[Int])
+  case class SourceLinkParameter(token: String, url: String, code: Option[String], folder_id: Option[String])
   // {"referer": "12341", "remote_ip": "10.10.0.1"}
   case class ClickParameter(referer: String, remote_ip: String)
 
@@ -198,8 +201,11 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
       pathEnd {
         post {
           entity(as[SourceLinkParameter]) { link =>
-            // TODO: parameters validation
-            doPostLinkResponse(link)
+            val validator = new UrlValidator(Array("http", "https"))
+            validator.isValid(link.url) match {
+              case true => doPostLinkResponse(link)
+              case false => complete(HttpResponse(BadRequest))
+            }
           }
         } ~
         get {
@@ -212,7 +218,6 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
         pathEnd {
           post {
             entity(as[ClickParameter]) { click =>
-              // TODO: parameters validation
               val clicks = addNewClicks(code, click.referer, click.remote_ip)
               redirect(s"/link/${clicks.head}", PermanentRedirect)
             }
@@ -223,31 +228,99 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
             }
           }
         } ~
-          pathSuffix("clicks") {
-            get {
-              complete(code.toString)
+        pathSuffix("clicks") {
+          get {
+            parameters('token.as[String], 'offset ? 0, 'limit ? 25) { (token, offset, limit) =>
+              doGetClicksResponse(token, code, offset, limit)
             }
           }
+        }
       }
   } ~
-  path("folder") {
+  pathPrefix("folder") {
     pathEnd {
       get {
         parameters('token.as[String]) { token =>
-          complete("not implemented")
+          doGetFolderResponse(token)
         }
       }
     } ~
-    pathSuffix(LongNumber) { id =>
+    pathSuffix(IntNumber) { id =>
       get {
-        parameters('token.as[String], 'offset ? 0, 'limit ? "25") { (token, offset, limit) =>
-          complete("not implemented")
+        parameters('token.as[String], 'offset ? 0, 'limit ? 25) { (token, offset, limit) =>
+          doGetFolderResponseById(token, id, offset, limit)
         }
       }
     }
   }
 
   ////////////// responses //////////////
+
+  def doGetFolderResponse(token: String): Route = {
+    val folders: Seq[Folder] = db withSession { implicit session =>
+      (for {
+        u <- Users   if u.token === token
+        f <- Folders if f.user_id === u.id
+      } yield f).run
+    }
+
+    respondWithMediaType(`application/json`) {
+      import FoldersJsonProtocol._
+      val jsonFolders = for {f <- folders} yield f.toJson
+      complete(JsObject("folders" -> jsonFolders.toJson))
+    }
+  }
+
+
+  def doGetFolderResponseById(token: String, id: Int, offset: Int, limit: Int): Route = {
+    val offset0: Int = if (offset > 0) offset else 0
+    val limit0: Int = if (limit > 0) limit else 25
+
+    val links: Seq[Link] = db withSession { implicit session =>
+      (for {
+        u <- Users if u.token === token
+        f <- Folders if f.user_id === u.id && f.id === id
+        fl <- FolderLinks if fl.folder_id === f.id
+        l <- Links if l.id === fl.link_id
+      } yield l)
+        .run
+        .drop(offset0).take(limit0)
+    }
+
+    if (links.length > 0) {
+      respondWithMediaType(`application/json`) {
+        import LinksJsonProtocol._
+        val jsonLinks = for {l <- links} yield l.toJson
+        complete(JsObject("links" -> jsonLinks.toJson))
+      }
+    }
+    else {
+      complete(HttpResponse(NotFound))
+    }
+  }
+
+
+  def doGetClicksResponse(token: String, code: String, offset: Int, limit: Int): Route = {
+    val offset0 = if (offset > 0) offset else 0
+    val limit0 = if (limit > 0) limit else 25
+
+    val clicks = db withSession { implicit session =>
+      val existClicks: Seq[Click] = (for {
+        u <- Users if u.token === token
+        l <- Links if l.user_id === u.id
+        c <- Clicks if c.link_id === l.id
+      } yield c).run
+
+      existClicks.drop(offset0).take(limit0)
+    }
+
+    respondWithMediaType(`application/json`) {
+      import ClicksJsonProtocol._
+      val jsonClicks = for {c <- clicks} yield c.toJson
+      complete(JsObject("clicks" -> jsonClicks.toJson))
+    }
+  }
+
 
   def doGetLinkResponse(token: String, code: String): Route = {
     db withSession { implicit session =>
@@ -256,15 +329,33 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
         l <- Links if l.user_id === u.id && l.code === code
       } yield l).run.headOption
 
+
       link match {
         case Some(l) => {
+          val clicks: Seq[Click] = Clicks.findByLinkId(l.id.get).run
+          // getting folders
+          val folderLink: Option[FolderLink] = FolderLinks.findByLinkId(l.id.get).run.headOption
+          val folder: Option[Folder] = folderLink match {
+            case Some(fl) => Folders.findById(fl.folder_id).run.headOption
+            case None => None
+          }
+
           respondWithMediaType(`application/json`) {
-            complete(JsObject("link" -> JsObject(
-              "url" -> JsString(l.url),
-              "code" -> JsString(l.code))//,
-//              "folder" -> JsString(l),
-//              "clicks" -> JsNumber()
-            ).prettyPrint)
+            folder match {
+              case Some(f) => {
+                complete(JsObject("link" -> JsObject(
+                  "url" -> JsString(l.url),
+                  "code" -> JsString(l.code)),
+                  "clicks" -> JsNumber(clicks.length),
+                  "folder" -> JsString(f.title)).prettyPrint)
+              }
+              case None => {
+                complete(JsObject("link" -> JsObject(
+                  "url" -> JsString(l.url),
+                  "code" -> JsString(l.code)),
+                  "clicks" -> JsNumber(clicks.length)).prettyPrint)
+              }
+            }
           }
         }
         case None => complete(HttpResponse(NotFound))
@@ -296,6 +387,25 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
 
 
   def doPostLinkResponse(link: SourceLinkParameter): Route = {
+    // Make new folder and link //
+    def createFolderForLink(link0: Option[Link]) {
+      // adding new folder
+      val folder: Option[Folder] = link.folder_id match {
+        case Some(title: String) =>
+          addNewFolder(link.token, title)
+      }
+      // adding new link to folder connection
+      try {
+        val folder0: Int = folder.get.id.get
+        val id: Int = link0.get.id.get
+        connectLinkWithFolder(folder0, id)
+      } catch {
+        case e: Exception => complete(HttpResponse(UnprocessableEntity,
+          s"new folder link creation failed:\n ${e.toString}"))
+      }
+    }
+    // end //
+
     isLinkExist(link.token, link.url) match {
       case true => {
         getLink(link.token, link.url) match {
@@ -304,11 +414,22 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
         }
       }
       case false => {
-        val user_id = getUserId(link.token)
-        val newLink = addNewHashLink(link.token, link.url)
+        val newLink: Option[Link] = link.code match {  // code parameter is empty
+          case None => {
+            // adding new link
+            val link0: Option[Link] = addNewHashLink(link.token, link.url)
+            createFolderForLink(link0)
+            link0
+          }
+          case Some(code) => {
+            val link0: Option[Link] = addNewUserLink(link.token, link.url, code)
+            createFolderForLink(link0)
+            link0
+          }
+        }
 
         newLink match {
-          case Some(l) => completeLinkAsJson(l.url, l.code)
+          case Some(l) => completeLinkAsJson(link.url, l.code)
           case None => complete(HttpResponse(UnprocessableEntity))
         }
       }
@@ -396,15 +517,51 @@ trait ShortenedServerService extends HttpService with UsersHashIDs with UrlCodec
 
       user match {
         case Some(user) => {
-          val link = Link(None, user.id.get, url, code, false)
+          // create link record
+          val link = Link(None, user.id.get, url, code, is_user_link = false)
           Links insert link
-          Some(link)
+          // get that link by another query because we have to get non empty folder primary key id
+          val links: Seq[Link] = Links.findByUserId(user.id.get).run
+          val link0: Option[Link] = links.find(p = _.code == code)
+          link0
+
         }
         case None => {
           None
         }
       }
     }
+  }
+
+  def addNewFolder(token: String, title: String): Option[Folder] = {
+    db withSession { implicit session =>
+      val user: Option[User] = (for {
+        u <- Users if u.token === token
+      } yield u).run.headOption
+
+      user match {
+        case Some(user) => {
+          // create folder record
+          val folder = Folder(None, user.id.get, title)
+          Folders insert folder
+          // get that folder by another query because we have to get non empty folder primary key id
+          val folders: Seq[Folder] = Folders.findByUserId(user.id.get).run
+          val folder0 = folders.filter(_.title == title).headOption
+          folder0
+        }
+        case None => {
+          None
+        }
+      }
+    }
+  }
+
+
+  def connectLinkWithFolder(folder_id: Int, link_id: Int) = {
+    db withSession { implicit session =>
+      FolderLinks insert FolderLink(folder_id, link_id)
+    }
+
   }
 
 
