@@ -219,6 +219,7 @@ class ApiController extends UsersHashIDs with UrlCodec {
       val folder: Option[Folder] = link.folder_id match {
         case Some(title: String) =>
           addNewFolder(link.token, title)
+        case None => None
       }
       // adding new link to folder connection
       try {
