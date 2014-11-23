@@ -55,7 +55,7 @@ Run 'sbt run' or 'activator run' command in your terminal
 | "/folder"            | GET    | returned Json with list of folders                  | token: String
 | "/folder/:id"        | GET    | returned Json with list of links ib folder          | token: String,  offset: Option[Int], limit: Option[Int]
 
-All POST request parametersh should be send as json with Content-Type: application/json headers.
+All POST request parameters should be send as json with Content-Type: application/json headers.
 For example body of POST request to /link:
 
 { "token":"be79ded6", "url":"http://www.google.com"}
