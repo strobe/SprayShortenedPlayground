@@ -1,16 +1,14 @@
 package cc.evgeniy.shortened
 
-import org.joda.time._
 import org.joda.time.DateTime
 import spray.json._
 
-//import scala.slick.driver.PostgresDriver.simple._
 import cc.evgeniy.shortened.ExtendedPostgresDriver.simple._
 import com.github.tototoshi.slick.PostgresJodaSupport._
 import com.github.tminglei.slickpg._
 
 
-/// User ///
+/** User **/
 // mapped User type
 case class User(id: Option[Long], token: String)
 
@@ -27,10 +25,10 @@ class Users(tag: Tag) extends Table[User](tag, "Users") {
 object Users extends TableQuery(new Users(_)) {
   val findByToken = this.findBy(_.token)
 }
-/// end ///
+/** end **/
 
 
-/// Folder ///
+/** Folder **/
 // mapped Folder type
 case class Folder(id: Option[Int], user_id: Long, title: String)
 
@@ -53,10 +51,10 @@ object Folders extends TableQuery(new Folders(_)) {
   val findByTitle = this.findBy(_.title)
   val findByUserId = this.findBy(_.user_id)
 }
-/// end ///
+/** end **/
 
 
-/// Link ///
+/** Link **/
 // mapped Link type
 case class Link(id: Option[Int], user_id: Long, url: String, code: String, is_user_link: Boolean)
 
@@ -94,10 +92,10 @@ object Links extends TableQuery(new Links(_)) {
   val findByUrl = this.findBy(_.url)
   val findByUserId = this.findBy(_.user_id)
 }
-/// end ///
+/** end **/
 
 
-/// Click ///
+/** Click **/
 // mapped User type
 case class Click(id: Option[Int], link_id: Int, date: DateTime, referer: String, remote_ip: InetString)
 
@@ -138,10 +136,10 @@ object Clicks extends TableQuery(new Clicks(_)) {
   val findByDate    = this.findBy(_.date)
   val findByReferer = this.findBy(_.referer)
 }
-/// end ///
+/** end **/
 
 
-/// FolderLinks ///
+/** FolderLinks **/
 // mapped FolderLinks type
 case class FolderLink(folder_id: Int, link_id: Int)
 
@@ -177,4 +175,4 @@ object FolderLinks extends TableQuery(new FolderLinks(_)) {
   val findByFolderId = this.findBy(_.folder_id)
   val findByLinkId   = this.findBy(_.link_id)
 }
-/// end ///
+/** end **/

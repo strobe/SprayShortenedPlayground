@@ -3,28 +3,17 @@ package cc.evgeniy.shortened
 import akka.actor._
 import _root_.akka.io.IO
 import akka.util.Timeout
-import com.github.tminglei.slickpg.InetString
 import org.apache.commons.validator.routines.UrlValidator
 import org.hashids.Hashids
 import spray.can.Http
-import spray.http.{StatusCode, HttpResponse, HttpEntity}
+import spray.http.{HttpResponse, HttpEntity}
 import spray.http.StatusCodes._
 import spray.http.MediaTypes._
 import spray.httpx.SprayJsonSupport
 import spray.json._
-import spray.routing
-import spray.routing.{Route, HttpService}
-import spray.routing.authentication.BasicAuth
-import org.joda.time.DateTime
-import org.joda.time._
-import scala.concurrent.Future
+import spray.routing.HttpService
 import scala.concurrent.duration._
 import akka.pattern.ask
-import scala.slick.lifted.AppliedCompiledFunction
-import cc.evgeniy.shortened.ExtendedPostgresDriver.simple._
-import com.github.tototoshi.slick.PostgresJodaSupport._
-import scala.slick.lifted
-import com.typesafe.config.ConfigFactory
 
 
 /**
