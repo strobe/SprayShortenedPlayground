@@ -46,7 +46,7 @@ Run 'sbt run' or 'activator run' command in your terminal
 |:---------------------|:-------| :---------------------------------------------------|:-----------
 | "/"                  | GET    | index html page                                     |
 | "/ping"              | GET    | simple PONG response                                |
-| "/token"             | GET    | returned token for new or exist user                | user_id: Int, secret: String
+| "/token"             | GET    | returned token Json for new or exist user           | user_id: Int, secret: String
 | "/link"              | POST   | returned Link Json with url and code                | token: String, url: String, code: Option[String], folder_id: Option[String]
 | "/link"              | GET    | returned list of links as Json                      | token: String,  offset: Option[Int], limit: Option[Int]
 | "/link/:code"        | POST   | redirected to GET /link/:code                       | referer: String, remote_ip: String
