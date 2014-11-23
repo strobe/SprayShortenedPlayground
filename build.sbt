@@ -37,7 +37,6 @@ libraryDependencies ++= Seq(
     ,"commons-codec"          % "commons-codec"         % "1.9"
     // base62
     ,"com.timesprint"         %% "hashids-scala" % "1.0.0"
-//    ,"com.github.tototoshi" %% "scala-base62" % "0.1.0"
 )
 
 
