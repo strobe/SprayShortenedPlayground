@@ -296,7 +296,10 @@ class ApiController extends UsersHashIDs with UrlCodec {
                      url: String,
                      isUserLink: Boolean = false,
                      userLink: Option[String] = None): String = {
-    val last: Option[Long] = decode(getLastLinkCode(token).get).headOption
+    val last: Option[Long] = getLastLinkCode(token) match {
+      case Some(c) => decode(c).headOption
+      case None => None
+    }
 
     // return intit code if no any link doesn't exist and new if exist
     last match {
