@@ -47,11 +47,17 @@ Run 'sbt run' or 'activator run' command in your terminal
 | "/"                  | GET    | index html page                                     |
 | "/ping"              | GET    | simple PONG response                                |
 | "/token"             | GET    | returned token Json for new or exist user           | user_id: Int, secret: String
-| "/link"              | POST   | returned Link Json with url and code                | token: String, url: String, code: Option[String], folder_id: Option[String]
+| "/link"              | POST   | returned Link Json with url and code                | token: String, url: String, code: Option[String], folder_id: Option[String] ** Link should be a valid http:// or https:// url **
 | "/link"              | GET    | returned list of links as Json                      | token: String,  offset: Option[Int], limit: Option[Int]
 | "/link/:code"        | POST   | redirected to GET /link/:code                       | referer: String, remote_ip: String
 | "/link/:code"        | GET    | returned Json with link adn related clicks, folders | token: String
 | "/link/:code/clicks" | GET    | returned Json with list of clicks                   | token: String,  offset: Option[Int], limit: Option[Int]
 | "/folder"            | GET    | returned Json with list of folders                  | token: String
 | "/folder/:id"        | GET    | returned Json with list of links ib folder          | token: String,  offset: Option[Int], limit: Option[Int]
+
+All POST request parametersh should be send as json with Content-Type: application/json headers.
+For example body of POST request to /link:
+
+{ "token":"be79ded6", "url":"http://www.google.com"}
+
 
